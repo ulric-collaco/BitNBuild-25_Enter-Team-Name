@@ -201,14 +201,12 @@ async def analyze_sentiment_endpoint(request: ReviewRequest):
     if not request.reviews:
         raise HTTPException(status_code=400, detail="No reviews provided")
     
-    if len(request.reviews) > 100:  # Limit batch size
+    if len(request.reviews) > 100:
         raise HTTPException(status_code=400, detail="Too many reviews. Maximum 100 reviews per request.")
-    
+
     try:
         start_time = time.time()
-        logger.info(f"Analyzing {len(request.reviews)} reviews")
-        
-        sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
+        logger.info(f"Analyzing {len(request.reviews)} reviews")        sentiment_counts = {"positive": 0, "neutral": 0, "negative": 0}
         individual_results = []
         
         for review in request.reviews:
