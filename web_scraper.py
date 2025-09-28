@@ -74,23 +74,36 @@ def extract_json_block(text: str) -> str:
     cleaned = re.sub(r",\s*}", "}", cleaned)
     cleaned = re.sub(r",\s*]", "]", cleaned)
     
-    # Fix unquoted property names (common Gemini issue)
-    cleaned = re.sub(r'(\w+):', r'"\1":', cleaned)
+    # Fix unquoted property names more precisely (common Gemini issue)
+    cleaned = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', cleaned)
     
     # Fix single quotes to double quotes
     cleaned = re.sub(r"'([^']*)'", r'"\1"', cleaned)
     
-    # Fix escaped quotes that might break JSON
-    cleaned = re.sub(r'\\"', '"', cleaned)
+    # Fix multiple escaped quotes that might break JSON
+    cleaned = re.sub(r'\\+"', '"', cleaned)
     
     # Remove any trailing text after the JSON ends
     cleaned = re.sub(r'(\]|\})\s*.*$', r'\1', cleaned, flags=re.DOTALL)
     
-    # Try to locate a JSON object/array within the text
-    json_match = re.search(r"\[.*\]|\{.*\}", cleaned, re.DOTALL)
+    # Remove trailing commas more aggressively
+    cleaned = re.sub(r',(\s*[\]\}])', r'\1', cleaned)
+    
+    # Try to locate a JSON array first (most common case)
+    json_match = re.search(r"\[[\s\S]*\]", cleaned)
+    if json_match:
+        json_str = json_match.group(0)
+        # Clean control characters and fix final trailing commas
+        json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)
+        json_str = re.sub(r',(\s*[\]\}])', r'\1', json_str)
+        return json_str
+
+    # Fallback to object matching
+    json_match = re.search(r"\{[\s\S]*\}", cleaned)
     if json_match:
         json_str = json_match.group(0)
         json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)
+        json_str = re.sub(r',(\s*[\]\}])', r'\1', json_str)
         return json_str
 
     return cleaned
@@ -200,16 +213,23 @@ Generate all 60-75 reviews with unique, specific comments. make sure its a rando
         try:
             print("🔄 ATTEMPTING ALTERNATIVE JSON PARSING...")
             
-            # Method 1: Try to fix and parse again
+            # Method 1: Try improved extract_json_block again
             json_payload = extract_json_block(gemini_text)
             
-            # Method 2: Try to manually extract just the array part
-            array_match = re.search(r'\[[\s\S]*\]', gemini_text)
-            if array_match:
-                json_payload = array_match.group(0)
-                json_payload = re.sub(r',(\s*[\]\}])', r'\1', json_payload)
-                json_payload = re.sub(r'([{,]\s*)(\w+):', r'\1"\2":', json_payload)
-                
+            # Method 2: More aggressive JSON cleaning
+            if not json_payload.startswith('['):
+                # Find the array manually
+                array_match = re.search(r'\[[\s\S]*\]', gemini_text)
+                if array_match:
+                    json_payload = array_match.group(0)
+                    
+            # Method 3: Clean up common issues
+            json_payload = re.sub(r',(\s*[\]\}])', r'\1', json_payload)  # trailing commas
+            json_payload = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', json_payload)  # unquoted keys
+            json_payload = re.sub(r"'([^']*)'", r'"\1"', json_payload)  # single to double quotes
+            json_payload = re.sub(r'\\+"', '"', json_payload)  # fix escaped quotes
+            
+            # Try parsing
             normalized = json.loads(json_payload)
             if isinstance(normalized, list):
                 normalized = {
