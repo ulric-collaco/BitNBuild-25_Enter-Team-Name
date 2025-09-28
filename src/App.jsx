@@ -12,35 +12,72 @@ function App() {
     setIsAnalyzing(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('🚀 Starting analysis for URL:', url);
+      console.log('📡 Sending request to web scraper API...');
       
-      // Mock response data
-      const mockData = {
+      // Call the web scraper API
+      const response = await fetch('http://localhost:8001/scrape-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: url })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Web scraper response received');
+      console.log('📊 Response status:', result.status);
+      console.log('💬 Response message:', result.message);
+      console.log('🎯 Check the Web Scraper terminal for detailed AI analysis output!');
+
+      // Parse the Gemini response which should be the analysis result
+      let analysisResult;
+      try {
+        analysisResult = JSON.parse(result.gemini_response);
+      } catch (parseError) {
+        console.error('Failed to parse Gemini response:', parseError);
+        throw new Error('Invalid response format from analysis service');
+      }
+
+      console.log('📊 Analysis result:', analysisResult);
+      
+      // Transform the API response to match our Dashboard component expectations
+      const transformedData = {
         url: url,
-        sentimentBreakdown: [
-          { name: 'Positive', value: 65, color: '#22c55e' },
-          { name: 'Negative', value: 20, color: '#ef4444' },
-          { name: 'Neutral', value: 15, color: '#6b7280' }
-        ],
-        positiveKeywords: [
-          'excellent', 'great quality', 'fast shipping', 'love it', 'perfect',
-          'amazing', 'highly recommend', 'good value', 'satisfied', 'awesome'
-        ],
-        negativeKeywords: [
-          'poor quality', 'too expensive', 'broke quickly', 'disappointed',
-          'not worth it', 'terrible', 'waste of money', 'defective'
-        ],
+        status: result.status,
+        message: result.message,
+        rawResponse: analysisResult,
+        sentimentBreakdown: analysisResult.sentiment_distribution ? 
+          analysisResult.sentiment_distribution.map(item => ({
+            name: item.sentiment.charAt(0).toUpperCase() + item.sentiment.slice(1),
+            value: Math.round(item.percentage),
+            color: item.sentiment === 'positive' ? '#22c55e' : 
+                   item.sentiment === 'negative' ? '#ef4444' : '#6b7280'
+          })) : [
+            { name: 'Positive', value: 0, color: '#22c55e' },
+            { name: 'Negative', value: 0, color: '#ef4444' },
+            { name: 'Neutral', value: 0, color: '#6b7280' }
+          ],
+        positiveKeywords: analysisResult.keywords?.positive || [],
+        negativeKeywords: analysisResult.keywords?.negative || [],
         overallSentiment: {
-          score: 85,
-          label: 'Very Positive'
-        }
+          score: analysisResult.overall_sentiment?.confidence || 0,
+          label: analysisResult.overall_sentiment?.sentiment || 'Unknown'
+        },
+        totalReviews: analysisResult.summary?.total_reviews || 0,
+        emotions: analysisResult.emotion_distribution || []
       };
       
-      setAnalysisData(mockData);
+      setAnalysisData(transformedData);
       setHasResults(true);
+      
     } catch (error) {
-      console.error('Analysis failed:', error);
+      console.error('❌ Analysis failed:', error);
+      alert(`Analysis failed: ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }

@@ -74,13 +74,7 @@ const UrlInput = ({ onAnalyze, isLoading }) => {
           </button>
         </form>
 
-        {isLoading && (
-          <div className="mt-8 p-6 bg-white/10 backdrop-blur rounded-xl border border-white/20">
-            <p className="text-white text-center font-medium">
-              Analyzing reviews and extracting insights...
-            </p>
-          </div>
-        )}
+
       </div>
     </div>
   );
