@@ -1,2 +1,3 @@
 node_modules
 /backend/test_api.py
+/backend/__pycache__
