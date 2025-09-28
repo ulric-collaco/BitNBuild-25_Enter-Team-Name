@@ -53,3 +53,4 @@ Thumbs.db
 
 # Test files
 /backend/test_api.py 
+.vercel

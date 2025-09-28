@@ -11,6 +11,9 @@ function AppLogic() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Use environment variable for production, fallback to Railway URL
+  const WEB_SCRAPER_URL = process.env.REACT_APP_WEB_SCRAPER_URL || 'https://webscrapemaybe-production.up.railway.app';
+
   const handleAnalyze = async (url) => {
     setCurrentUrl(url);
     
@@ -19,10 +22,10 @@ function AppLogic() {
     
     try {
       console.log('🚀 Starting analysis for URL:', url);
-      console.log('📡 Sending request to web scraper API...');
+      console.log('📡 Sending request to web scraper API:', WEB_SCRAPER_URL);
       
       // Call the web scraper API
-      const response = await fetch('http://localhost:8001/scrape-url', {
+      const response = await fetch(`${WEB_SCRAPER_URL}/scrape-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
