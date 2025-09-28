@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Review Radar - Web Scraper API",
-    description="",
-    version="1.0.0"
+    description="Web scraper with improved JSON parsing",
+    version="1.0.1"
 )
 app.add_middleware(
     CORSMiddleware,
