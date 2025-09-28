@@ -27,7 +27,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# Environment variables
+# Environment variables hi
 .env
 .env.local
 .env.development.local
