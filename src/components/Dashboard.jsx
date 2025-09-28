@@ -87,9 +87,17 @@ const Dashboard = ({ data, onReset }) => {
               <h3 className="text-lg font-semibold text-gray-900">Top Positive Keywords</h3>
             </div>
             <div className="flex flex-wrap">
-              {positiveKeywords.slice(0, 8).map((keyword, index) => (
-                <KeywordTag key={index} keyword={keyword} type="positive" />
-              ))}
+              {positiveKeywords && positiveKeywords.length > 0 ? (
+                positiveKeywords.slice(0, 8).map((keywordObj, index) => (
+                  <KeywordTag 
+                    key={index} 
+                    keyword={typeof keywordObj === 'string' ? keywordObj : keywordObj.keyword} 
+                    type="positive" 
+                  />
+                ))
+              ) : (
+                <span className="text-gray-500 italic">No positive keywords found</span>
+              )}
             </div>
           </div>
 
@@ -100,9 +108,17 @@ const Dashboard = ({ data, onReset }) => {
               <h3 className="text-lg font-semibold text-gray-900">Top Negative Keywords</h3>
             </div>
             <div className="flex flex-wrap">
-              {negativeKeywords.slice(0, 8).map((keyword, index) => (
-                <KeywordTag key={index} keyword={keyword} type="negative" />
-              ))}
+              {negativeKeywords && negativeKeywords.length > 0 ? (
+                negativeKeywords.slice(0, 8).map((keywordObj, index) => (
+                  <KeywordTag 
+                    key={index} 
+                    keyword={typeof keywordObj === 'string' ? keywordObj : keywordObj.keyword} 
+                    type="negative" 
+                  />
+                ))
+              ) : (
+                <span className="text-gray-500 italic">No negative keywords found</span>
+              )}
             </div>
           </div>
         </div>

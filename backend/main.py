@@ -93,9 +93,18 @@ def load_models():
         logger.info("Keyword extraction model loaded successfully")
         
         logger.info("All models loaded successfully")
+        print("\n" + "="*60)
+        print("🎉 REVIEW RADAR - MAIN API SERVER READY!")
+        print("="*60)
+        print("✅ Sentiment Analysis Model: CardiffNLP RoBERTa (LOADED)")
+        print("✅ Keyword Extraction Model: KeyBERT + MiniLM (LOADED)")
+        print("🚀 Server running on: http://localhost:8000")
+        print("📊 Ready to process dashboard analysis requests!")
+        print("="*60 + "\n")
         
     except Exception as e:
         logger.error(f"Error loading models: {str(e)}")
+        print("❌ FAILED TO START - Models could not be loaded!")
         raise e
 
 def preprocess_text(text: str) -> str:
