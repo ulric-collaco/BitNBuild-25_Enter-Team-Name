@@ -142,9 +142,8 @@ def extract_repeated_keywords(comments: List[str], top_k: int = 10) -> List[tupl
         # Extract keywords using KeyBERT (correct API)
         keywords = keyword_model.extract_keywords(
             combined_text, 
-            keyphrase_ngram_range=(1, 3),  # 1 to 3 word phrases
+            keyphrase_ngram_range=(1, 3),  # 1 to 3 word phrases  
             stop_words='english',
-            top_k=top_k * 2,  # Get more candidates
             use_mmr=True,  # Use Maximal Marginal Relevance for diversity
             diversity=0.5
         )
@@ -161,8 +160,15 @@ def extract_repeated_keywords(comments: List[str], top_k: int = 10) -> List[tupl
         return filtered_keywords[:top_k]
         
     except Exception as e:
-        logger.error(f"Error in keyword extraction: {str(e)}")
-        return []
+        # Fallback to simple approach if KeyBERT fails
+        logger.error(f"KeyBERT failed: {str(e)}, trying simple extraction")
+        try:
+            combined_text = " ".join(comments)
+            simple_keywords = keyword_model.extract_keywords(combined_text)
+            return simple_keywords[:top_k] if simple_keywords else []
+        except Exception as e2:
+            logger.error(f"Simple extraction also failed: {str(e2)}")
+            return []
 
 # Load models on startup
 load_models()
