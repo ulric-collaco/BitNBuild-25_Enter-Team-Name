@@ -227,6 +227,13 @@ async def analyze_dashboard_endpoint(request: DashboardRequest):
     
     try:
         start_time = time.time()
+        print("\n" + "📥" * 40)
+        print("📥 RECEIVED REQUEST FROM WEB_SCRAPER.PY!")
+        print("📥" * 40)
+        print(f"📊 Processing {len(request.reviews)} reviews for dashboard analysis...")
+        print(f"⏰ Started at: {time.strftime('%H:%M:%S')}")
+        print("-" * 80)
+        
         logger.info(f"Processing {len(request.reviews)} reviews for dashboard analysis")
         
         # Initialize counters
@@ -289,6 +296,14 @@ async def analyze_dashboard_endpoint(request: DashboardRequest):
         
         processing_time = time.time() - start_time
         logger.info(f"Dashboard analysis completed in {processing_time:.2f} seconds")
+        
+        print("\n✅ ANALYSIS COMPLETE - SENDING TO FRONTEND!")
+        print("=" * 50)
+        print(f"📈 Sentiment Analysis: {response.checklist.sentiment.positive}+ | {response.checklist.sentiment.neutral}≈ | {response.checklist.sentiment.negative}-")
+        print(f"🔑 Keywords Extracted: {len(response.keywords.positive_keywords)} positive, {len(response.keywords.negative_keywords)} negative")
+        print(f"⚡ Processing Time: {processing_time:.2f} seconds")
+        print(f"🎯 Frontend will redirect to /dashboard")
+        print("=" * 50 + "\n")
         
         return response
         

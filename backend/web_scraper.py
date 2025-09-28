@@ -72,7 +72,7 @@ def ensure_model() -> genai.GenerativeModel:
     return model
 
 def extract_json_block(text: str) -> str:
-    """Attempt to extract the JSON block from the Gemini response."""
+    """Attempt to extract and fix the JSON block from the Gemini response."""
     cleaned = text.strip()
 
     # Remove markdown fences if present
@@ -83,10 +83,27 @@ def extract_json_block(text: str) -> str:
     cleaned = re.sub(r",\s*}", "}", cleaned)
     cleaned = re.sub(r",\s*]", "]", cleaned)
     
+    # Fix unquoted property names (common Gemini issue)
+    cleaned = re.sub(r'(\w+):', r'"\1":', cleaned)
+    
+    # Fix single quotes to double quotes
+    cleaned = re.sub(r"'([^']*)'", r'"\1"', cleaned)
+    
+    # Fix escaped quotes that might break JSON
+    cleaned = re.sub(r'\\"', '"', cleaned)
+    
+    # Remove any trailing text after the JSON ends
+    cleaned = re.sub(r'(\]|\})\s*.*$', r'\1', cleaned, flags=re.DOTALL)
+    
     # Try to locate a JSON object/array within the text
-    json_match = re.search(r"\{.*\}|\[.*\]", cleaned, re.DOTALL)
+    json_match = re.search(r"\[.*\]|\{.*\}", cleaned, re.DOTALL)
     if json_match:
-        return json_match.group(0)
+        json_str = json_match.group(0)
+        
+        # Final cleanup: remove any invalid characters
+        json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)
+        
+        return json_str
 
     return cleaned
 
@@ -197,18 +214,53 @@ Generate all 60-75 reviews with unique, specific comments. make sure its a rando
         raise
     except (json.JSONDecodeError, ValueError) as parse_error:
         logger.error("Failed to parse Gemini response: %s", parse_error)
-        return ScrapedResponse(
-            url=request.url,
-            gemini_response=gemini_text if "gemini_text" in locals() else str(parse_error),
-            status="partial_success",
-            message=f"Gemini response could not be parsed: {parse_error}",
-        )
+        
+        # Try alternative parsing methods
+        try:
+            print("🔄 ATTEMPTING ALTERNATIVE JSON PARSING...")
+            
+            # Method 1: Try to fix and parse again
+            json_payload = extract_json_block(gemini_text)
+            
+            # Method 2: Try to manually extract just the array part
+            array_match = re.search(r'\[[\s\S]*\]', gemini_text)
+            if array_match:
+                json_payload = array_match.group(0)
+                # Additional fixes for common issues
+                json_payload = re.sub(r',(\s*[\]\}])', r'\1', json_payload)  # Remove trailing commas
+                json_payload = re.sub(r'([{,]\s*)(\w+):', r'\1"\2":', json_payload)  # Quote property names
+                
+            normalized = json.loads(json_payload)
+            if isinstance(normalized, list):
+                normalized = {
+                    "source_url": request.url,
+                    "total_reviews": len(normalized),
+                    "reviews": normalized,
+                }
+            
+            print("✅ ALTERNATIVE PARSING SUCCESSFUL!")
+            
+        except Exception as alt_error:
+            logger.error("Alternative parsing also failed: %s", alt_error)
+            print("❌ ALL PARSING METHODS FAILED")
+            print(f"Raw Gemini response (first 1000 chars): {gemini_text[:1000]}")
+            
+            return ScrapedResponse(
+                url=request.url,
+                gemini_response=gemini_text if "gemini_text" in locals() else str(parse_error),
+                status="partial_success",
+                message=f"Gemini response could not be parsed: {parse_error}. Alternative parsing: {alt_error}",
+            )
     except Exception as exc:
         logger.error("Gemini request failed: %s", exc)
         raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}")
 
     try:
         print("\n🔄 FORWARDING TO MAIN API...")
+        print(f"📤 SENDING {len(normalized.get('reviews', []))} REVIEWS TO MAIN.PY")
+        print(f"🎯 Target: {MAIN_API_URL.rstrip('/')}/analyze-dashboard")
+        print("-" * 40)
+        
         analysis_response = requests.post(
             f"{MAIN_API_URL.rstrip('/')}/analyze-dashboard",
             json=normalized,
