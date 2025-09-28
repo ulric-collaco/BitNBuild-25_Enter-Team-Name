@@ -10,21 +10,16 @@ from typing import Dict, Any
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
 app = FastAPI(
     title="Review Radar - Web Scraper API",
-    description="Web scraper service that forwards URLs to Google Gemini and processes responses",
+    description="",
     version="1.0.0"
 )
-
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,8 +27,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Pydantic models
 class UrlRequest(BaseModel):
     url: str
 
@@ -43,7 +36,6 @@ class ScrapedResponse(BaseModel):
     status: str
     message: str
 
-# Initialize Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
 MAIN_API_URL = os.getenv("MAIN_API_URL", "http://localhost:8000")
@@ -61,7 +53,7 @@ def get_gemini_model() -> genai.GenerativeModel:
 
     try:
         return genai.GenerativeModel(GEMINI_MODEL_NAME)
-    except Exception as exc:  # pragma: no cover - covers external dependency errors
+    except Exception as exc:
         logger.error("Failed to initialise Gemini model: %s", exc)
         raise HTTPException(status_code=500, detail=f"Failed to initialise Gemini model: {exc}")
 
@@ -72,7 +64,6 @@ def ensure_model() -> genai.GenerativeModel:
     return model
 
 def extract_json_block(text: str) -> str:
-    """Attempt to extract and fix the JSON block from the Gemini response."""
     cleaned = text.strip()
 
     # Remove markdown fences if present
@@ -99,16 +90,12 @@ def extract_json_block(text: str) -> str:
     json_match = re.search(r"\[.*\]|\{.*\}", cleaned, re.DOTALL)
     if json_match:
         json_str = json_match.group(0)
-        
-        # Final cleanup: remove any invalid characters
         json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)
-        
         return json_str
 
     return cleaned
 
 def normalize_gemini_response(raw_text: str, source_url: str) -> Dict[str, Any]:
-    """Convert Gemini's raw text into the dashboard-ready JSON structure."""
     json_payload = extract_json_block(raw_text)
     data = json.loads(json_payload)
 
@@ -152,9 +139,6 @@ async def health_check():
 
 @app.post("/scrape-url", response_model=ScrapedResponse)
 async def scrape_url_endpoint(request: UrlRequest):
-    """
-    Receives URL from frontend, forwards to Google Gemini, and processes response
-    """
     print("\n" + "🎯" * 40)
     print("🚀 NEW FRONTEND REQUEST RECEIVED!")
     print("🎯" * 40)
@@ -164,14 +148,11 @@ async def scrape_url_endpoint(request: UrlRequest):
 
     logger.info("Received URL for scraping: %s", request.url)
 
-    # Validate URL
     if not request.url.strip():
         raise HTTPException(status_code=400, detail="URL is required")
 
     if not (request.url.startswith("http://") or request.url.startswith("https://")):
         raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
-
-    # Create prompt for AI (must remain untouched)
     gemini_prompt = f"""Generate exactly 60-75 realistic customer reviews for: {request.url}
 
 IMPORTANT: Make reviews highly specific to this product mentioning: 
@@ -226,9 +207,8 @@ Generate all 60-75 reviews with unique, specific comments. make sure its a rando
             array_match = re.search(r'\[[\s\S]*\]', gemini_text)
             if array_match:
                 json_payload = array_match.group(0)
-                # Additional fixes for common issues
-                json_payload = re.sub(r',(\s*[\]\}])', r'\1', json_payload)  # Remove trailing commas
-                json_payload = re.sub(r'([{,]\s*)(\w+):', r'\1"\2":', json_payload)  # Quote property names
+                json_payload = re.sub(r',(\s*[\]\}])', r'\1', json_payload)
+                json_payload = re.sub(r'([{,]\s*)(\w+):', r'\1"\2":', json_payload)
                 
             normalized = json.loads(json_payload)
             if isinstance(normalized, list):
@@ -291,7 +271,6 @@ Generate all 60-75 reviews with unique, specific comments. make sure its a rando
 
 @app.post("/test-ai")
 async def test_ai_connection():
-    """Test endpoint to verify AI API connection"""
     try:
         gemini_client = ensure_model()
         test_response = gemini_client.generate_content("Hello, this is a test. Please respond with 'AI service is working correctly.'")
