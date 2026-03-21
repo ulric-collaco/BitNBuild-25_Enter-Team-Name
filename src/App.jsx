@@ -1,83 +1,143 @@
-import React, { useState } from 'react';
-import UrlInput from './components/UrlInput';
-import Dashboard from './components/Dashboard';
-import LightRays from './LightRays';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import HomePage from './components/HomePage';
+import LoadingPage from './components/LoadingPage';
+import DashboardPage from './components/DashboardPage';
 
-function App() {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [hasResults, setHasResults] = useState(false);
+// Main App Logic Component
+function AppLogic() {
   const [analysisData, setAnalysisData] = useState(null);
+  const [currentUrl, setCurrentUrl] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Use environment variable for production, fallback to Railway URL
+  const WEB_SCRAPER_URL = process.env.REACT_APP_WEB_SCRAPER_URL || 'https://webscrapemaybe-production.up.railway.app';
 
   const handleAnalyze = async (url) => {
-    setIsAnalyzing(true);
+    setCurrentUrl(url);
+    
+    // Navigate to loading page immediately
+    navigate('/loading');
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('🚀 Starting analysis for URL:', url);
+      console.log('📡 Sending request to web scraper API:', WEB_SCRAPER_URL);
       
-      // Mock response data
-      const mockData = {
-        url: url,
-        sentimentBreakdown: [
-          { name: 'Positive', value: 65, color: '#22c55e' },
-          { name: 'Negative', value: 20, color: '#ef4444' },
-          { name: 'Neutral', value: 15, color: '#6b7280' }
-        ],
-        positiveKeywords: [
-          'excellent', 'great quality', 'fast shipping', 'love it', 'perfect',
-          'amazing', 'highly recommend', 'good value', 'satisfied', 'awesome'
-        ],
-        negativeKeywords: [
-          'poor quality', 'too expensive', 'broke quickly', 'disappointed',
-          'not worth it', 'terrible', 'waste of money', 'defective'
-        ],
-        overallSentiment: {
-          score: 85,
-          label: 'Very Positive'
+      // Call the web scraper API
+      const response = await fetch(`${WEB_SCRAPER_URL}/scrape-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: url })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Web scraper response received');
+      console.log('📊 Response status:', result.status);
+      console.log('💬 Response message:', result.message);
+      console.log('🎯 Check the Web Scraper terminal for detailed AI analysis output!');
+
+      // Parse the analysis response
+      let analysisResult;
+      try {
+        if (typeof result.gemini_response === 'string') {
+          analysisResult = JSON.parse(result.gemini_response);
+        } else {
+          analysisResult = result.gemini_response;
         }
+      } catch (parseError) {
+        console.error('Failed to parse analysis response:', parseError);
+        throw new Error('Invalid response format from analysis service');
+      }
+
+      console.log('📊 Analysis result:', analysisResult);
+      
+      // Transform the API response to match Dashboard expectations
+      const transformedData = {
+        url: url,
+        status: result.status,
+        message: result.message,
+        rawResponse: analysisResult,
+        sentimentBreakdown: analysisResult.checklist?.sentiment ? [
+          { 
+            name: 'Positive', 
+            value: analysisResult.checklist.sentiment.positive, 
+            color: '#22c55e' 
+          },
+          { 
+            name: 'Negative', 
+            value: analysisResult.checklist.sentiment.negative, 
+            color: '#ef4444' 
+          },
+          { 
+            name: 'Neutral', 
+            value: analysisResult.checklist.sentiment.neutral, 
+            color: '#6b7280' 
+          }
+        ] : [
+          { name: 'Positive', value: 0, color: '#22c55e' },
+          { name: 'Negative', value: 0, color: '#ef4444' },
+          { name: 'Neutral', value: 0, color: '#6b7280' }
+        ],
+        positiveKeywords: analysisResult.keywords?.positive_keywords || [],
+        negativeKeywords: analysisResult.keywords?.negative_keywords || [],
+        overallSentiment: {
+          score: analysisResult.average_rating || 0,
+          label: analysisResult.checklist?.sentiment?.positive > analysisResult.checklist?.sentiment?.negative ? 'Positive' : 
+                 analysisResult.checklist?.sentiment?.negative > analysisResult.checklist?.sentiment?.positive ? 'Negative' : 'Neutral'
+        },
+        totalReviews: analysisResult.total_reviews || 0,
+        emotions: [] // Removed as per requirements
       };
       
-      setAnalysisData(mockData);
-      setHasResults(true);
+      setAnalysisData(transformedData);
+      
+      // Navigate to dashboard after processing is complete
+      navigate('/dashboard');
+      
     } catch (error) {
-      console.error('Analysis failed:', error);
-    } finally {
-      setIsAnalyzing(false);
+      console.error('❌ Analysis failed:', error);
+      alert(`Analysis failed: ${error.message}`);
+      
+      // Navigate back to home on error
+      navigate('/');
     }
   };
 
   const handleReset = () => {
-    setHasResults(false);
     setAnalysisData(null);
+    setCurrentUrl('');
+    navigate('/');
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 relative">
-      {/* Background Light Rays */}
-      <div style={{ width: '100%', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 0 }}>
-        <LightRays
-          raysOrigin="top-center"
-          raysColor="#FFFFFF"
-          raysSpeed={0.3}
-          lightSpread={0.5}
-          rayLength={1.0}
-          followMouse={true}
-          mouseInfluence={0.1}
-          noiseAmount={0.05}
-          distortion={0.02}
-          className="custom-rays"
-        />
-      </div>
+    <Routes>
+      <Route path="/" element={<HomePage onAnalyze={handleAnalyze} />} />
+      <Route path="/loading" element={<LoadingPage url={currentUrl} />} />
+      <Route 
+        path="/dashboard" 
+        element={
+          analysisData ? 
+            <DashboardPage analysisData={analysisData} onReset={handleReset} /> :
+            <HomePage onAnalyze={handleAnalyze} />
+        } 
+      />
+    </Routes>
+  );
+}
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8 relative z-10">
-        {!hasResults ? (
-          <UrlInput onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
-        ) : (
-          <Dashboard data={analysisData} onReset={handleReset} />
-        )}
-      </main>
-    </div>
+// Main App Component with Router
+function App() {
+  return (
+    <Router>
+      <AppLogic />
+    </Router>
   );
 }
 
